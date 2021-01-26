@@ -22,8 +22,13 @@ impl CPU {
 
     }
 
-    pub fn load(&self, addr: usize) -> u8 {
+    pub fn get_byte_mem(&self, addr: usize) -> u8 {
         self.memory.borrow()[addr]
     }
+
+    pub fn store_byte_mem(&self, addr: usize, value: u8)  {
+        self.memory.borrow_mut()[addr] = value;
+    }
+
 
 }

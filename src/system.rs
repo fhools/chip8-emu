@@ -5,6 +5,7 @@ use crate::cpu::CPU;
 use crate::rom::ROM;
 
 pub const MEMSIZE: usize = 4*1024;
+pub const ROM_OFFSET: usize = 0x200;
 
 #[derive(Debug)]
 pub struct System {
@@ -12,7 +13,7 @@ pub struct System {
    mem: Rc<RefCell<Vec<u8>>>
 }
 
-pub enum SystemError {
+pub enum Error {
     None,
     Err
 }
@@ -28,11 +29,9 @@ impl System {
         }
     }
 
-    pub fn load_rom(&mut self, rom: &ROM) -> Result<(), SystemError> {
+    pub fn load_rom(&mut self, rom: &ROM) {
         for (data, i) in rom.data().iter().zip(0..rom.size()){
-            println!("i {}, data {:x}", i, data);
-            self.mem.borrow_mut()[0x200 + i] = *data;
+            self.mem.borrow_mut()[ROM_OFFSET + i] = *data;
         }
-        Ok(())
     }
 }

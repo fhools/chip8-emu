@@ -253,7 +253,9 @@ fn main() {
                 }
                 let mut system = System::new();
                 system.load_rom(&rom);
-                println!("byte 0 is {:x}", system.cpu.load(0x200));
+                system.cpu.store_byte_mem(0x01, 0xA0);
+                println!("byte 0x0 is {:x}", system.cpu.get_byte_mem(0x200));
+                println!("byte 0x1 is {:x}", system.cpu.get_byte_mem(0x1));
             }
         }
     }
