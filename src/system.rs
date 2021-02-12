@@ -14,7 +14,6 @@ pub struct System {
 }
 
 pub enum Error {
-    None,
     Err
 }
 
@@ -32,6 +31,20 @@ impl System {
     pub fn load_rom(&mut self, rom: &ROM) {
         for (data, i) in rom.data().iter().zip(0..rom.size()){
             self.mem.borrow_mut()[ROM_OFFSET + i] = *data;
+        }
+    }
+
+    pub fn run(&mut self) {
+        loop {
+            let instr = self.cpu.fetch_instr_from_pc();
+            match instr {
+                Ok(ins) => {
+                    ins.execute(&mut self.cpu);
+                }, 
+                Err(err) => {
+                    println!("Error fetching instruction {}", err);
+                }
+            }
         }
     }
 }
