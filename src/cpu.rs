@@ -12,7 +12,7 @@ pub struct CPU {
     stack: Vec<u16>,
     memory: Rc<RefCell<Vec<u8>>>,
     curr_keys: [Option<bool>; 16],
-    is_halted: bool
+    is_halted: bool // Is the program done executing? Self Jp
 }
 
 impl CPU {
