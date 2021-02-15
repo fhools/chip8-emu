@@ -1,20 +1,28 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt::{self};
+use rand::Rng;
 
 #[derive(Debug)]
 pub struct CPU {
     pc: u16,
     vregs: [u8; 16],
     i: u16,
+    vf: bool,
     stack: Vec<u16>,
-    memory: Rc<RefCell<Vec<u8>>>
+    memory: Rc<RefCell<Vec<u8>>>,
+    curr_keys: [Option<bool>; 16],
+    is_halted: bool
 }
 
 impl CPU {
     pub fn stack_push(&mut self, addr: u16) {
         assert_eq!(self.stack.len() < 16, true);
         self.stack.push(addr);
+    }
+
+    pub fn is_halted(&self) -> bool {
+        self.is_halted
     }
 }
 #[derive(Debug)]
@@ -36,7 +44,7 @@ impl fmt::Display for DecodeError {
 pub trait Instruction : fmt::Display {
     fn print(&self) -> String;
 
-    fn do_instr(&self, cpu: &mut CPU) {
+    fn do_instr(&self, _cpu: &mut CPU) {
         println!("\t\t{}", self);
     }
     
@@ -49,6 +57,7 @@ pub trait Instruction : fmt::Display {
         self.do_instr(cpu);
         self.incr_pc(cpu);
     }
+
      
 }
 
@@ -148,7 +157,7 @@ impl fmt::Display for ClrInstr {
 }
 
 pub struct JpInstr {
-    pub addr : u16
+    pub addr : u16,
 }
 
 impl Instruction for JpInstr {
@@ -160,11 +169,16 @@ impl Instruction for JpInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         println!("Executing {}", self);
+        if cpu.pc == self.addr {
+            println!("JP to same address. Must be the end of the program");
+            cpu.is_halted = true
+        }
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
         cpu.pc = self.addr;
     }
+
 }
 
 impl fmt::Display for JpInstr {
@@ -213,6 +227,18 @@ impl Instruction for SneInstr {
         let sne = format!("SNE V{:x}, {:x}", self.vx, self.val);
         sne 
     }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        println!("executed {}", self);
+    }
+
+    fn incr_pc(&self, cpu: &mut CPU) {
+        if cpu.vregs[self.vx as usize] != self.val {
+            cpu.pc += 4;
+        } else {
+            cpu.pc +=2;
+        }
+    }
 }
 
 impl fmt::Display for SneInstr {
@@ -230,6 +256,18 @@ impl Instruction for SeRegsInstr {
     fn print(&self) -> String {
         let se = format!("SE V{:x}, V{:x}", self.vx, self.vy);
         se
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        println!("executed {}", self);
+    }
+
+    fn incr_pc(&self, cpu: &mut CPU) {
+        if cpu.vregs[self.vx as usize] != cpu.vregs[self.vy as usize] {
+            cpu.pc += 4;
+        } else {
+            cpu.pc +=2;
+        }
     }
 }
 
@@ -249,6 +287,10 @@ impl Instruction for LdValInstr {
         let ld = format!("LD V{:X}, {:x}", self.vx, self.value); 
         ld
     }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.vregs[self.vx as usize] = self.value;
+    }
 }
 
 impl fmt::Display for LdValInstr {
@@ -266,6 +308,11 @@ impl Instruction for AddImmediateInstr {
     fn print(&self) -> String {
         let add = format!("ADD V{:X}, {:x}", self.vx, self.value); 
         add
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        println!("vregs {:X} = {:X} value = {:X}", self.vx,cpu.vregs[self.vx as usize], self.value );
+        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_add(self.value);
     }
 }
 
@@ -285,6 +332,10 @@ impl Instruction for LdRegInstr {
         let ld = format!("LD V{:X}, V{:X}", self.vx, self.vy);
         ld
     }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.vregs[self.vx as usize] = cpu.vregs[self.vy as usize];
+    }
 }
 
 impl fmt::Display for LdRegInstr {
@@ -302,6 +353,10 @@ impl Instruction for OrInstr {
     fn print(&self) -> String {
         let ld = format!("OR V{:X}, V{:X}", self.vx, self.vy);
         ld
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize] | cpu.vregs[self.vy as usize];
     }
 }
 
@@ -321,6 +376,10 @@ impl Instruction for AndInstr {
         let ld = format!("AND V{:X}, V{:X}", self.vx, self.vy);
         ld
     }
+    
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize] & cpu.vregs[self.vy as usize];
+    }
 }
 
 impl fmt::Display for AndInstr {
@@ -339,6 +398,10 @@ impl Instruction for XorInstr {
         let xor = format!("XOR V{:X}, V{:X}", self.vx, self.vy);
         xor 
     }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize] ^ cpu.vregs[self.vy as usize];
+    }
 }
 
 impl fmt::Display for XorInstr {
@@ -354,8 +417,14 @@ struct AddInstr {
 
 impl Instruction for AddInstr {
     fn print(&self) -> String {
-        let xor = format!("ADD V{:X}, V{:X}", self.vx, self.vy);
-        xor 
+        let add = format!("ADD V{:X}, V{:X}", self.vx, self.vy);
+        add
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        let (add_result, carry) = cpu.vregs[self.vx as usize].overflowing_add(cpu.vregs[self.vy as usize]); 
+        cpu.vregs[self.vx as usize] = add_result;
+        cpu.vf = carry;
     }
 }
 
@@ -372,8 +441,14 @@ struct SubInstr {
 
 impl Instruction for SubInstr {
     fn print(&self) -> String {
-        let xor = format!("SUB V{:X}, V{:X}", self.vx, self.vy);
-        xor 
+        let sub = format!("SUB V{:X}, V{:X}", self.vx, self.vy);
+        sub 
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        let (sub_result, not_underflow) = cpu.vregs[self.vx as usize].overflowing_sub(cpu.vregs[self.vy as usize]); 
+        cpu.vregs[self.vx as usize] = sub_result;
+        cpu.vf = !not_underflow;
     }
 }
 
@@ -390,8 +465,15 @@ struct ShrInstr {
 
 impl Instruction for ShrInstr {
     fn print(&self) -> String {
-        let xor = format!("SHR V{:X}, V{:X}", self.vx, self.vy);
-        xor 
+        let shr = format!("SHR V{:X}, V{:X}", self.vx, self.vy);
+        shr 
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+       if cpu.vregs[self.vx as usize] & 1 == 1 {
+           cpu.vf = true;
+       }
+       cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_shr(1); 
     }
 }
 
@@ -408,8 +490,14 @@ struct SubnInstr {
 
 impl Instruction for SubnInstr {
     fn print(&self) -> String {
-        let xor = format!("SUBN V{:X}, V{:X}", self.vx, self.vy);
-        xor 
+        let subn = format!("SUBN V{:X}, V{:X}", self.vx, self.vy);
+        subn
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        let (sub_result, not_underflow) = cpu.vregs[self.vx as usize].overflowing_sub(cpu.vregs[self.vy as usize]); 
+        cpu.vregs[self.vx as usize] = sub_result;
+        cpu.vf = not_underflow;
     }
 }
 
@@ -429,6 +517,13 @@ impl Instruction for ShlInstr {
         let shl = format!("SHL V{:X}, V{:X}", self.vx, self.vy);
         shl 
     }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+       if cpu.vregs[self.vx as usize] & 0x80 == 0x80 {
+           cpu.vf = true;
+       }
+       cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_shl(1); 
+    }
 }
 
 impl fmt::Display for ShlInstr {
@@ -447,6 +542,18 @@ impl Instruction for SneRegInstr {
         let sne = format!("SNE V{:X}, V{:X}", self.vx, self.vy);
         sne 
     }
+
+    fn do_instr(&self, _cpu: &mut CPU) {
+        println!("executed {}", self);
+    }
+
+    fn incr_pc(&self, cpu: &mut CPU) {
+        if cpu.vregs[self.vx as usize] != cpu.vregs[self.vy as usize] {
+            cpu.pc += 4;
+        } else {
+            cpu.pc +=2;
+        }
+    }
 }
 
 impl fmt::Display for SneRegInstr {
@@ -464,9 +571,63 @@ impl Instruction for LdIInstr {
         let ld_i = format!("LD I, {:X}", self.addr);
         ld_i 
     }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.i = self.addr; 
+    }
 }
 
 impl fmt::Display for LdIInstr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.print())
+    }
+}
+
+struct RndInstr {
+    vx: u8,
+    value: u8
+}
+
+impl Instruction for RndInstr {
+    fn print(&self) -> String {
+        let rnd = format!("RND V{:X}, 0x{:X}", self.vx, self.value);
+        rnd 
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        println!("executed {}", self);
+        let mut rng = rand::thread_rng();
+        let random_byte : u8 = rng.gen();
+        cpu.vregs[self.vx as usize] = random_byte & self.value; 
+    }
+}
+
+impl fmt::Display for RndInstr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.print())
+    }
+}
+
+struct JpV0Instr {
+    addr: u16
+}
+
+impl Instruction for JpV0Instr {
+    fn print(&self) -> String {
+        let jpv0 = format!("JP V0, 0x{:X}", self.addr);
+        jpv0 
+    }
+
+    fn do_instr(&self, _cpu: &mut CPU) {
+        println!("executed {}", self);
+    }
+
+    fn incr_pc(&self, cpu: &mut CPU) {
+        cpu.pc = cpu.vregs[0] as u16 + self.addr;
+    }
+}
+
+impl fmt::Display for JpV0Instr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.print())
     }
@@ -483,6 +644,10 @@ impl Instruction for DrwInstr {
         let drw = format!("DRW V{:X}, V{:X}, {:x}", self.vx, self.vy, self.value);
         drw
     }
+
+    fn do_instr(&self, cpu: &mut CPU)  {
+        println!("executed {}", self)
+    }
 }
 
 impl fmt::Display for DrwInstr {
@@ -498,6 +663,21 @@ struct SkpInstr {
 impl Instruction for SkpInstr {
     fn print(&self) -> String {
         format!("SKP V{:X}", self.vx)
+    }
+
+    fn do_instr(&self, _cpu: &mut CPU) {
+        println!("executed {}", self)
+    }
+
+    fn incr_pc(&self, cpu: &mut CPU) {
+        match cpu.curr_keys[self.vx as usize] {
+            Some(_) => {
+                    cpu.pc += 4;
+                    return;
+            },
+            None => {}
+        }
+        cpu.pc += 2;
     }
 }
 
@@ -674,7 +854,10 @@ impl CPU {
             vregs: [0; 16],
             stack: vec![],
             i: 0,
-            memory: mem 
+            vf: false,
+            memory: mem,
+            curr_keys: [None; 16],
+            is_halted: false
         }
     }
 
@@ -691,7 +874,6 @@ impl CPU {
                     u16::from(self.memory.borrow()[addr+1]);
         instr.into()
     }
-
 
     fn decode_instr(&self, instr: u16) -> Result<Box<dyn Instruction>, DecodeError> {
         let bits15_12 : u8 = (instr >> 12) as u8;
@@ -722,7 +904,7 @@ impl CPU {
             },
             // JP NNN
             0x1 => {
-                result =  Ok(Box::new(JpInstr { addr: nnn })) 
+                result =  Ok(Box::new(JpInstr { addr: nnn})) 
             },
             // CALL NNN
             0x2 => {
@@ -800,6 +982,13 @@ impl CPU {
             0xA => {
                 result = Ok(Box::new(LdIInstr{ addr: nnn }))
             },
+            0xB => {
+                result = Ok(Box::new(JpV0Instr{ addr: nnn }))
+            }
+            0xC => {
+                let byte : u8 = (bits7_4 as u8) << 4 | bits3_0; 
+                result = Ok(Box::new(RndInstr{ vx: bits11_8, value: byte }))
+            }
             0xD => {
                 result = Ok(Box::new(DrwInstr{ vx: bits11_8, vy: bits7_4, value: bits3_0}))
             },

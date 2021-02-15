@@ -40,6 +40,9 @@ impl System {
             match instr {
                 Ok(ins) => {
                     ins.execute(&mut self.cpu);
+                    if self.cpu.is_halted() {
+                        break;
+                    }
                 }, 
                 Err(err) => {
                     println!("Error fetching instruction {}", err);
