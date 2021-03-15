@@ -2,17 +2,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt::{self};
 use rand::Rng;
-
+use crate::System;
 #[derive(Debug)]
 pub struct CPU {
-    pc: u16,
-    vregs: [u8; 16],
-    i: u16,
-    vf: bool,
-    stack: Vec<u16>,
-    memory: Rc<RefCell<Vec<u8>>>,
-    curr_keys: [Option<bool>; 16],
-    is_halted: bool // Is the program done executing? Self Jp
+    pub pc: u16,
+    pub vregs: [u8; 16],
+    pub i: u16,
+    pub vf: bool,
+    pub stack: Vec<u16>,
+    pub memory: Rc<RefCell<Vec<u8>>>,
+    pub curr_keys: [Option<bool>; 16],
+    pub dt: u8,                        // Delay Timer, decrements a tick every 60HZ
+    pub st: u8,                        // Sound Timer, decrements a tick every 60HZ
+    pub is_halted: bool                // Is the program done executing? Self Jp
 }
 
 impl CPU {
@@ -40,6 +42,12 @@ impl fmt::Display for DecodeError {
         }
     }
 }
+use core::fmt::Debug;
+impl Debug for dyn Instruction {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Series{{{}}}", self.print())
+    }
+}
 
 pub trait Instruction : fmt::Display {
     fn print(&self) -> String;
@@ -47,7 +55,7 @@ pub trait Instruction : fmt::Display {
     fn do_instr(&self, _cpu: &mut CPU) {
         println!("\t\t{}", self);
     }
-    
+    // Must be called after execute() to finish executing instruction including setting up for pc for next step
     fn incr_pc(&self, cpu: &mut CPU) {
         cpu.pc += 2;
     }
@@ -55,9 +63,15 @@ pub trait Instruction : fmt::Display {
     fn execute(&self, cpu: &mut CPU) {
         println!("Executing instr pc = 0x{:X}", cpu.pc);
         self.do_instr(cpu);
-        self.incr_pc(cpu);
     }
 
+    fn check_completed(&self, _system: &mut System) -> bool {
+        return true
+    }
+
+    fn is_waited_instr(&self) -> bool {
+        return false
+    }
      
 }
 
@@ -228,7 +242,7 @@ impl Instruction for SneInstr {
         sne 
     }
 
-    fn do_instr(&self, cpu: &mut CPU) {
+    fn do_instr(&self, _cpu: &mut CPU) {
         println!("executed {}", self);
     }
 
@@ -646,7 +660,7 @@ impl Instruction for DrwInstr {
     }
 
     fn do_instr(&self, cpu: &mut CPU)  {
-        println!("executed {}", self)
+        println!("Drawing pixel at {}, {}", self.vx, self.vy)
     }
 }
 
@@ -695,6 +709,21 @@ impl Instruction for SknpInstr {
     fn print(&self) -> String {
         format!("SKNP V{:X}", self.vx)
     }
+
+    fn do_instr(&self, _cpu: &mut CPU) {
+        println!("executed {}", self);
+    }
+
+    fn incr_pc(&self, cpu: &mut CPU) {
+        match cpu.curr_keys[self.vx as usize] {
+            Some(_) => {},
+            None => {
+                cpu.pc += 4;
+                return;
+            }
+        }
+        cpu.pc += 2;
+    }
 }
 
 impl fmt::Display for SknpInstr {
@@ -710,6 +739,10 @@ struct LdDtInstr {
 impl Instruction for LdDtInstr {
     fn print(&self) -> String {
         format!("LD V{:X}, DT", self.vx)
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.vregs[self.vx as usize] = cpu.dt;
     }
 }
 
@@ -727,6 +760,19 @@ impl Instruction for LdKeyInstr {
     fn print(&self) -> String {
         format!("LD V{:X}, K", self.vx)
     }
+
+    fn do_instr(&self, _cpu: &mut CPU) {
+
+    }
+
+    fn is_waited_instr(&self) -> bool {
+        return true;
+    }
+
+    fn check_completed(&self, _system: &mut System) -> bool {
+        return false
+    }
+
 }
 
 impl fmt::Display for LdKeyInstr {
@@ -857,7 +903,9 @@ impl CPU {
             vf: false,
             memory: mem,
             curr_keys: [None; 16],
-            is_halted: false
+            is_halted: false,
+            dt: 255,
+            st: 255
         }
     }
 
@@ -875,7 +923,7 @@ impl CPU {
         instr.into()
     }
 
-    fn decode_instr(&self, instr: u16) -> Result<Box<dyn Instruction>, DecodeError> {
+    fn decode_instr(instr: u16) -> Result<Box<dyn Instruction>, DecodeError> {
         let bits15_12 : u8 = (instr >> 12) as u8;
         let bits11_8 : u8 = ((instr >> 8) & 0xF) as u8;
         let bits7_4 : u8 = ((instr >> 4) & 0xF) as u8;
@@ -1058,7 +1106,7 @@ impl CPU {
 
     pub fn fetch_instr_from_pc(&self) -> Result<Box<dyn Instruction>, DecodeError> {
         let instr = self.fetch_instr_from_addr(self.pc as usize);
-        let decodedInstr = self.decode_instr(instr);
-        decodedInstr
+        let decoded_instr = CPU::decode_instr(instr);
+        decoded_instr
     }
 }
