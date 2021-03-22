@@ -66,9 +66,12 @@ impl IntoIterator for &ROM {
         let mut i = 0;
         let mut romdata : Vec<Self::Item> = vec![];
 
+        println!("size of ROM: {}", self.size());
         while i < self.data.len() {
             let mut word : u16 = (self.data[i] as u16) << 8;
-            word = word | (self.data[i+1] as u16);
+            if i + 1 < self.size() {
+                word = word | (self.data[i+1] as u16);
+            }
             i += 2;
             romdata.push(word);
         }

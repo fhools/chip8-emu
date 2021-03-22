@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt::{self};
+use std::any::Any;
+
 use rand::Rng;
 use crate::System;
 #[derive(Debug)]
@@ -49,7 +51,7 @@ impl Debug for dyn Instruction {
     }
 }
 
-pub trait Instruction : fmt::Display {
+pub trait Instruction : fmt::Display  {
     fn print(&self) -> String;
 
     fn do_instr(&self, _cpu: &mut CPU) {
@@ -61,7 +63,7 @@ pub trait Instruction : fmt::Display {
     }
 
     fn execute(&self, cpu: &mut CPU) {
-        println!("Executing instr pc = 0x{:X}", cpu.pc);
+        println!("Executing instr pc = 0x{:X}, instr: {}", cpu.pc, self.print());
         self.do_instr(cpu);
     }
 
@@ -72,7 +74,8 @@ pub trait Instruction : fmt::Display {
     fn is_waited_instr(&self) -> bool {
         return false
     }
-     
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct SysInstr {
@@ -86,6 +89,10 @@ impl Instruction for SysInstr {
 
     fn do_instr(&self, _cpu: &mut CPU) {
         println!("executed SYS");
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -103,8 +110,13 @@ impl Instruction for ClrInstr {
     fn print(&self) -> String {
         "CLR".to_string()
     }
+
     fn do_instr(&self, _cpu: &mut CPU) {
         println!("excuted CLR");
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -129,6 +141,10 @@ impl Instruction for RetInstr {
                 println!("Error excuting return. Empty stack");
             }
         }
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -155,6 +171,10 @@ impl Instruction for CallInstr {
 
     fn incr_pc(&self, cpu: &mut CPU) {
         cpu.pc = self.addr;
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -193,6 +213,9 @@ impl Instruction for JpInstr {
         cpu.pc = self.addr;
     }
 
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for JpInstr {
@@ -222,6 +245,10 @@ impl Instruction for SeInstr {
         } else {
             cpu.pc +=2;
         }
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -253,6 +280,10 @@ impl Instruction for SneInstr {
             cpu.pc +=2;
         }
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for SneInstr {
@@ -283,6 +314,10 @@ impl Instruction for SeRegsInstr {
             cpu.pc +=2;
         }
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for SeRegsInstr {
@@ -304,6 +339,10 @@ impl Instruction for LdValInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.vregs[self.vx as usize] = self.value;
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -328,6 +367,10 @@ impl Instruction for AddImmediateInstr {
         println!("vregs {:X} = {:X} value = {:X}", self.vx,cpu.vregs[self.vx as usize], self.value );
         cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_add(self.value);
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AddImmediateInstr {
@@ -349,6 +392,10 @@ impl Instruction for LdRegInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.vregs[self.vx as usize] = cpu.vregs[self.vy as usize];
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -372,6 +419,10 @@ impl Instruction for OrInstr {
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize] | cpu.vregs[self.vy as usize];
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for OrInstr {
@@ -394,6 +445,10 @@ impl Instruction for AndInstr {
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize] & cpu.vregs[self.vy as usize];
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AndInstr {
@@ -415,6 +470,10 @@ impl Instruction for XorInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize] ^ cpu.vregs[self.vy as usize];
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -440,6 +499,10 @@ impl Instruction for AddInstr {
         cpu.vregs[self.vx as usize] = add_result;
         cpu.vf = carry;
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for AddInstr {
@@ -463,6 +526,10 @@ impl Instruction for SubInstr {
         let (sub_result, not_underflow) = cpu.vregs[self.vx as usize].overflowing_sub(cpu.vregs[self.vy as usize]); 
         cpu.vregs[self.vx as usize] = sub_result;
         cpu.vf = !not_underflow;
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -489,6 +556,10 @@ impl Instruction for ShrInstr {
        }
        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_shr(1); 
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for ShrInstr {
@@ -512,6 +583,10 @@ impl Instruction for SubnInstr {
         let (sub_result, not_underflow) = cpu.vregs[self.vx as usize].overflowing_sub(cpu.vregs[self.vy as usize]); 
         cpu.vregs[self.vx as usize] = sub_result;
         cpu.vf = not_underflow;
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -537,6 +612,10 @@ impl Instruction for ShlInstr {
            cpu.vf = true;
        }
        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_shl(1); 
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -568,6 +647,10 @@ impl Instruction for SneRegInstr {
             cpu.pc +=2;
         }
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for SneRegInstr {
@@ -588,6 +671,10 @@ impl Instruction for LdIInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.i = self.addr; 
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -614,6 +701,10 @@ impl Instruction for RndInstr {
         let random_byte : u8 = rng.gen();
         cpu.vregs[self.vx as usize] = random_byte & self.value; 
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for RndInstr {
@@ -639,6 +730,10 @@ impl Instruction for JpV0Instr {
     fn incr_pc(&self, cpu: &mut CPU) {
         cpu.pc = cpu.vregs[0] as u16 + self.addr;
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for JpV0Instr {
@@ -647,20 +742,28 @@ impl fmt::Display for JpV0Instr {
     }
 }
 
-struct DrwInstr {
-    vx: u8,
-    vy: u8,
-    value: u8 
+pub struct DrwInstr {
+    pub vx: u8,
+    pub vy: u8,
+    pub n: u8
 }
 
 impl Instruction for DrwInstr {
     fn print(&self) -> String {
-        let drw = format!("DRW V{:X}, V{:X}, {:x}", self.vx, self.vy, self.value);
+        let drw = format!("DRW V{:X}, V{:X}, {:x} ", self.vx, self.vy, self.n);
         drw
     }
 
     fn do_instr(&self, cpu: &mut CPU)  {
-        println!("Drawing pixel at {}, {}", self.vx, self.vy)
+        println!("Drawing pixel at V{:X}, {:X}, {} bytes", self.vx, self.vy, self.n)
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
+
+    fn is_waited_instr(&self) -> bool {
+        true
     }
 }
 
@@ -693,6 +796,10 @@ impl Instruction for SkpInstr {
         }
         cpu.pc += 2;
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for SkpInstr {
@@ -724,6 +831,10 @@ impl Instruction for SknpInstr {
         }
         cpu.pc += 2;
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for SknpInstr {
@@ -743,6 +854,10 @@ impl Instruction for LdDtInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         cpu.vregs[self.vx as usize] = cpu.dt;
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -773,6 +888,9 @@ impl Instruction for LdKeyInstr {
         return false
     }
 
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for LdKeyInstr {
@@ -788,6 +906,10 @@ struct StoreDtInstr {
 impl Instruction for StoreDtInstr {
     fn print(&self) -> String {
         format!("LD DT, V{:X}", self.vx)
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -805,6 +927,10 @@ impl Instruction for StoreStInstr {
     fn print(&self) -> String {
         format!("LD ST, V{:X}", self.vx)
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for StoreStInstr {
@@ -820,6 +946,10 @@ struct AddIInstr {
 impl Instruction for AddIInstr {
     fn print(&self) -> String {
         format!("ADD I,  V{:X}", self.vx)
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -837,6 +967,10 @@ impl Instruction for StoreSpriteInstr {
     fn print(&self) -> String {
         format!("LD F, V{:X}", self.vx)
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for StoreSpriteInstr {
@@ -852,6 +986,10 @@ struct StoreBcdInstr {
 impl Instruction for StoreBcdInstr {
     fn print(&self) -> String {
         format!("LD B, V{:X}", self.vx)
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -869,6 +1007,10 @@ impl Instruction for StoreVxsIntoIInstr{
     fn print(&self) -> String {
         format!("LD [I], V{:X}", self.vx)
     }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
+    }
 }
 
 impl fmt::Display for StoreVxsIntoIInstr {
@@ -884,6 +1026,10 @@ struct LdVxsFromIInstr {
 impl Instruction for LdVxsFromIInstr{
     fn print(&self) -> String {
         format!("LD V{:X}, [I]", self.vx)
+    }
+
+    fn as_any(&self) ->  &dyn Any {
+        self
     }
 }
 
@@ -1038,7 +1184,7 @@ impl CPU {
                 result = Ok(Box::new(RndInstr{ vx: bits11_8, value: byte }))
             }
             0xD => {
-                result = Ok(Box::new(DrwInstr{ vx: bits11_8, vy: bits7_4, value: bits3_0}))
+                result = Ok(Box::new(DrwInstr{ vx: bits11_8, vy: bits7_4, n: bits3_0}))
             },
             0xE => {
                 let lsbyte = bits7_4 << 4 | bits3_0;

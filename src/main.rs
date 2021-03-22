@@ -1,22 +1,29 @@
 /* Emulator for CHIP8 CPU */
 
+use std::io::BufWriter;
 use std::path::Path;
-use std::io::{BufWriter};
+use std::time::Duration;
 
-use clap::{Arg, App};
+use sdl2::pixels::Color;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::render::WindowCanvas;
 
-mod rom;
+use clap::{App, Arg};
+
 mod cpu;
+mod rom;
 mod system;
+mod display;
+use system::System;
 
-use system::System; 
-
+/*
 fn decode_instr(instr: u16) -> String {
     let bits15_12 = instr >> 12;
     let bits11_8 = (instr >> 8) & 0xF;
     let bits7_4 = (instr >> 4) & 0xF;
     let bits3_0 = (instr) & 0xF;
-    let nnn = (bits11_8 << 8) | (bits7_4 << 4) | bits3_0; 
+    let nnn = (bits11_8 << 8) | (bits7_4 << 4) | bits3_0;
     let result : String;
     match bits15_12 {
         // CLR
@@ -33,9 +40,9 @@ fn decode_instr(instr: u16) -> String {
                    }
                } else {
                    result = "UNSUPPORTED".to_string()
-                }                   
+                }
             } else {
-                 let sys = format!("SYS {:x}", 
+                 let sys = format!("SYS {:x}",
                                          nnn);
                  result = sys
             }
@@ -43,7 +50,7 @@ fn decode_instr(instr: u16) -> String {
         // JP NNN
         0x1 => {
             let jp = format!("JP {:x}", nnn);
-            result = jp 
+            result = jp
         },
         // CALL NNN
         0x2 => {
@@ -74,12 +81,12 @@ fn decode_instr(instr: u16) -> String {
         // LD Vx, KK
         0x6 => {
             let byte = bits7_4 << 4 | bits3_0;
-            let ld = format!("LD V{:X}, {:x}", bits11_8, byte); 
+            let ld = format!("LD V{:X}, {:x}", bits11_8, byte);
             result = ld
         },
         0x7 => {
             let byte = bits7_4 << 4 | bits3_0;
-            let add = format!("ADD V{:X}, {:x}", bits11_8, byte); 
+            let add = format!("ADD V{:X}, {:x}", bits11_8, byte);
             result = add
         },
         // LD Vx,Vy and ALU instructions
@@ -159,7 +166,7 @@ fn decode_instr(instr: u16) -> String {
 
 
         0xF => {
-            let f_opcode = bits7_4 << 4 | bits3_0;  
+            let f_opcode = bits7_4 << 4 | bits3_0;
             match f_opcode {
                 0x07 => {
                     let ld_dt = format!("LD V{:x}, DT", bits11_8);
@@ -204,7 +211,6 @@ fn decode_instr(instr: u16) -> String {
             }
         },
 
-                
         _ => {
             let unsupported = format!("unsupported {:x}", instr);
             result = unsupported
@@ -212,53 +218,78 @@ fn decode_instr(instr: u16) -> String {
     }
     result
 }
+*/
 
+fn main() -> Result<(), String> {
+    let sdl2_context = sdl2::init()?;
+    let video_subsystem = sdl2_context.video()?;
 
-fn main() {
+    let window  = video_subsystem.window("CHIP8 Emulator", 320, 200)
+        .position_centered()
+        .build()
+        .expect("could not initialize sdl2 video_subsystem");
+    
+    let mut canvas = window.into_canvas().build().expect("could not make sdl2 canvas");
+
+    let mut event_pump = sdl2_context.event_pump()?;
 
     let mut buf = BufWriter::new(Vec::new());
 
     let mut app = App::new("CHIP8 Disassembler")
         .version("0.1.0")
         .author("fhools")
-        .arg(Arg::with_name("file")
-             .short("f")
-             .long("file")
-             .takes_value(true)
-             .help("filepath to ROM"));
+        .arg(
+            Arg::with_name("file")
+                .short("f")
+                .long("file")
+                .takes_value(true)
+                .help("filepath to ROM"),
+        );
 
     app.write_long_help(&mut buf).unwrap();
     let argmatches = app.get_matches();
     let bytes = buf.into_inner().unwrap();
     let helpmessage = String::from_utf8(bytes).unwrap();
 
-
     let rom_filepath = argmatches.value_of("file");
-    match rom_filepath {
-        None => {
-            println!("{}", helpmessage);
-           
-        },
-
-        Some(filepath) => {
-            let rom = rom::read_rom(Path::new(filepath)); 
-            if let Err(err) = rom { 
-                println!("err: {}", err);
-            } else if let Ok(rom) = rom {
-                println!("read rom successfully");
-                println!("rom size is {}", rom.size());
-                let mut i = 0;
-                for w in rom.into_iter() {
-                    println!("word 0x{:x}: addr: 0x{:x} 0x{:x} {} ", i/2, 0x200 + i, w, decode_instr(w));
-                    i += 2;
-                }
-                let mut system = System::new();
-                system.load_rom(&rom);
-                system.cpu.store_byte_mem(0x01, 0xA0);
-                println!("byte 0x0 is {:x}", system.cpu.get_byte_mem(0x200));
-                println!("byte 0x1 is {:x}", system.cpu.get_byte_mem(0x1));
-                system.run();
-            }
+    let mut system = System::new();
+    if let None = rom_filepath {
+        println!("{}", helpmessage);
+        std::process::exit(1);
+    } else if let Some(filepath) = rom_filepath {
+        let rom = rom::read_rom(Path::new(filepath));
+        if let Err(err) = rom {
+            println!("err: {}", err);
+        } else if let Ok(rom) = rom {
+            println!("read rom successfully");
+            println!("rom size is {}", rom.size());
+            system.load_rom(&rom);
+          
         }
     }
+    
+   
+    'running: loop {
+        canvas.set_draw_color(Color::BLACK);
+        canvas.clear();
+
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit {..} |
+                Event::KeyDown { keycode: Some(Keycode::Escape), ..} => {
+                    break 'running;
+                },
+                _ => {}
+            }
+        }
+        
+        system.run_tick();
+        canvas.set_draw_color(Color::RED);
+        canvas.draw_point((0,0))?;
+        canvas.present();
+        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+
+    }
+    Ok(())
+
 }
