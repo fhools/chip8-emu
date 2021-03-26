@@ -1020,10 +1020,12 @@ impl Instruction for StoreVxsIntoIInstr{
     }
 
     fn do_instr(&self, cpu: &mut CPU) {
-        for i in 0..self.vx {
+        println!("Loading regs V0 to V{:X} into I ({:X})", self.vx, cpu.i);
+        for i in 0..(self.vx + 1) {
             cpu.store_byte_mem((cpu.i + (i as u16)) as usize, cpu.vregs[i as usize]);
         }
     }
+
     fn as_any(&self) ->  &dyn Any {
         self
     }
@@ -1045,7 +1047,7 @@ impl Instruction for LdVxsFromIInstr{
     }
 
     fn do_instr(&self, cpu: &mut CPU) {
-        for i in 0..self.vx {
+        for i in 0..(self.vx + 1) {
             cpu.vregs[i as usize] = cpu.get_byte_mem((cpu.i + (i as u16)) as usize);
         }
     }
