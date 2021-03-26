@@ -303,12 +303,12 @@ impl Instruction for SeRegsInstr {
         se
     }
 
-    fn do_instr(&self, cpu: &mut CPU) {
+    fn do_instr(&self, _cpu: &mut CPU) {
         //println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
-        if cpu.vregs[self.vx as usize] != cpu.vregs[self.vy as usize] {
+        if cpu.vregs[self.vx as usize] == cpu.vregs[self.vy as usize] {
             cpu.pc += 4;
         } else {
             cpu.pc +=2;
@@ -972,6 +972,11 @@ struct StoreSpriteInstr {
 impl Instruction for StoreSpriteInstr {
     fn print(&self) -> String {
         format!("LD F, V{:X}", self.vx)
+    }
+
+    fn do_instr(&self, cpu: &mut CPU) {
+        let vx_val = cpu.vregs[self.vx as usize];
+        cpu.i = vx_val as u16;
     }
 
     fn as_any(&self) ->  &dyn Any {

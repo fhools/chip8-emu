@@ -8,6 +8,26 @@ use crate::display::Display;
 pub const MEMSIZE: usize = 4*1024;
 pub const ROM_OFFSET: usize = 0x200;
 
+// character fonts. loaded into memory starting at address 0x0
+pub const FONT_DATA  : [u8; 80 ]= [
+    0xF0u8, 0x90u8, 0x90u8, 0x90u8, 0xF0u8, // 0 
+    0x20u8, 0x60u8, 0x20u8, 0x20u8, 0x70u8, // 1
+    0xF0u8, 0x10u8, 0xF0u8, 0x80u8, 0xF0u8, // 2
+    0xF0u8, 0x10u8, 0xF0u8, 0x10u8, 0xF0u8, // 3
+    0x90u8, 0x90u8, 0xF0u8, 0x10u8, 0x10u8, // 4
+    0xF0u8, 0x10u8, 0xF0u8, 0x10u8, 0xF0u8, // 5
+    0xF0u8, 0x80u8, 0xF0u8, 0x90u8, 0xF0u8, // 6
+    0xF0u8, 0x10u8, 0x20u8, 0x40u8, 0x40u8, // 7
+    0xF0u8, 0x90u8, 0xF0u8, 0x90u8, 0xF0u8, // 8
+    0xF0u8, 0x90u8, 0xF0u8, 0x10u8, 0xF0u8, // 9
+    0xf0u8, 0x90u8, 0xF0u8, 0x90u8, 0x90u8, // A
+    0xE0u8, 0x90u8, 0xE0u8, 0x90u8, 0xE0u8, // B
+    0xF0u8, 0x80u8, 0x80u8, 0x80u8, 0xF0u8, // C
+    0xE0u8, 0x90u8, 0x90u8, 0x90u8, 0xE0u8, // D
+    0xF0u8, 0x80u8, 0xF0u8, 0x80u8, 0xF0u8, // E
+    0xF0u8, 0x80u8, 0xF0u8, 0x80u8, 0x80u8, // F
+    ];
+    
 #[derive(Debug)]
 pub struct System {
    pub cpu: CPU,
@@ -28,13 +48,21 @@ pub enum Error {
 impl System {
     pub fn new() -> Self {
         let mem = Rc::new(RefCell::new(vec![0; MEMSIZE]));
-        System {
+        let system = System {
             cpu: CPU::new(mem.clone()),
             mem: mem.clone(),
             curr_instr:  None,
             display: Display::new(),
             draw_screen: false
+        };
+
+        // load font
+        let mut i = 0;
+        for sprite in  FONT_DATA.iter() {
+            system.cpu.store_byte_mem(i, *sprite);
+            i += 1;
         }
+        system
     }
 
     pub fn load_rom(&mut self, rom: &ROM) {
@@ -61,16 +89,18 @@ impl System {
             match ins {
                 Ok(instr) => {
                     instr.execute(&mut self.cpu);
+                    println!("PC: {:X} OPCODE: {:X} INSTR: {}", self.cpu.pc,  self.cpu.fetch_instr_from_addr(self.cpu.pc as usize) , instr.print());
                     if instr.is_waited_instr() {
                         self.curr_instr = Some(instr)
                     } else {
-                        instr.incr_pc(&mut self.cpu);
                          // Test if any of these are special instructions we should handle
-                        if  let Some(drw_instr) = instr.as_any().downcast_ref::<cpu::DrwInstr>() {
-                            println!("DRAW: {}", instr.print());
+                         if  let Some(drw_instr) = instr.as_any().downcast_ref::<cpu::DrwInstr>() {
+                           
                             self.do_drw_instr(drw_instr);
                             self.draw_screen = true
                         }
+                        instr.incr_pc(&mut self.cpu);
+                        
                     }
                 }, 
                 Err(err) => {

@@ -17,6 +17,13 @@ mod rom;
 mod system;
 use system::System;
 
+const DESIRED_FPS : u32 = 60;
+
+/* 
+    This was our initial prototype of decoding instructions.
+    No longer used, cpu::CPU::decode_instr does similar work but decodes into
+    Instruction trait object instead of just returning a string 
+
 
 fn decode_instr(instr: u16) -> String {
     let bits15_12 = instr >> 12;
@@ -218,6 +225,7 @@ fn decode_instr(instr: u16) -> String {
     }
     result
 }
+*/
 
 fn draw_screen(
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
@@ -304,11 +312,13 @@ fn main() -> Result<(), String> {
         } else if let Ok(rom) = rom {
             println!("read rom successfully");
             println!("rom size is {}", rom.size());
-            for i in rom.into_iter() {
-                let instr = cpu::CPU::decode_instr(i);
+            let mut i = 0;
+            for data in rom.into_iter() {
+                let instr = cpu::CPU::decode_instr(data);
                 if let Ok(instr) = instr {
-                    println!("instr: {:X} = {}", i, instr.print())
+                    println!("addr: {:0>4X} instr: {:0>4X} = {}", 0x200 + i, data, instr.print())
                 }
+                i += 2;
             }
             system.load_rom(&rom);
         }
@@ -348,8 +358,7 @@ fn main() -> Result<(), String> {
         let delta = since_the_epoch - previous_time;
         println!("{:?}", delta);
         previous_time = since_the_epoch;
-        let  fps = 60;
-        std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / fps));
+        std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / DESIRED_FPS));
     }
     Ok(())
 }
