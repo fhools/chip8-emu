@@ -999,6 +999,19 @@ impl Instruction for StoreBcdInstr {
         format!("LD B, V{:X}", self.vx)
     }
 
+    fn do_instr(&self,  cpu: &mut CPU) {
+        // Stores the hundreds digit into [I], tens digit into [I+1] and ones digit 
+        // into [I+3]
+        let mut value = cpu.vregs[self.vx as usize];
+        let ones = value % 10; 
+        value /= 10; 
+        let tens =  value % 10;
+        value /= 10;
+        let hundreds = value % 10;
+        cpu.store_byte_mem(cpu.i as usize, hundreds);
+        cpu.store_byte_mem((cpu.i + 1) as usize, tens);
+        cpu.store_byte_mem((cpu.i + 2) as usize, ones);
+    }
     fn as_any(&self) ->  &dyn Any {
         self
     }
