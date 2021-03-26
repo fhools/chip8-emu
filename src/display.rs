@@ -1,8 +1,15 @@
 use std::fmt;
 
-// screen dimensions in pixels
+// Actual emulator screen width, must same ratio as CHIP8 display 2:1
+pub const REAL_SCREEN_WIDTH_PIXELS : u16 = 512;
+pub const REAL_SCREEN_HEIGHT_PIXELS : u16 = 256;
+
+// CHIP8 screen dimensions in pixels
 pub const SCREEN_WIDTH_PIXELS : u16 = 64;
 pub const SCREEN_HEIGHT_PIXELS: u16 = 32;
+
+pub const PIXEL_WIDTH : u16 = REAL_SCREEN_WIDTH_PIXELS / SCREEN_WIDTH_PIXELS;
+pub const PIXEL_HEIGHT : u16 = REAL_SCREEN_WIDTH_PIXELS / SCREEN_WIDTH_PIXELS;
 
 // Each sprite is 8 pixels wide and up to 15 pixels height.
 pub const SPRITE_PIXELS_WIDTH : u16 = 8;
@@ -40,23 +47,33 @@ impl Display {
 
         for i in 0..sprite.len() {
             let mut old_screen_row = 0u8;
+            // Extract the current 8 bit screen value.
             for j in 0..SPRITE_PIXELS_WIDTH {
                 let row_index = (y+ (i as u8)) as usize;
                 let col_index = (x+(j as u8)) as usize;
-                println!("row_index: {}, col_index: {}", row_index, col_index);
+                //println!("row_index: {}, col_index: {}", row_index, col_index);
                 let pixel_value = self.mem[row_index % (SCREEN_HEIGHT_PIXELS as usize)][col_index % (SCREEN_WIDTH_PIXELS as usize)];
                 old_screen_row |= pixel_value << (SPRITE_PIXELS_WIDTH - j - 1);
             }
+            // New screen value is current value xor sprite value. 
             let new_screen_row = old_screen_row ^ sprite[i];
+            //println!("old_screen_row: {:X} sprite: {:X} new_screen_row: {:X}", old_screen_row, sprite[i], new_screen_row);
             // If there is difference in values after xoring sprite
-            if new_screen_row == old_screen_row {
+            if new_screen_row != old_screen_row {
                 // Update the display with new values.
                 for j in 0..SPRITE_PIXELS_WIDTH {
-                    self.mem[(y+ (i as u8)) as usize][(x+(j as u8)) as usize] = 
+                    let row_index = (y+ (i as u8)) as usize;
+                    let col_index = (x+(j as u8)) as usize;
+                    self.mem[row_index % (SCREEN_HEIGHT_PIXELS as usize)][col_index % (SCREEN_WIDTH_PIXELS as usize)] = 
                        (new_screen_row >> (SPRITE_PIXELS_WIDTH - j -1)) & 0x1;
+                    let new_pixel = (new_screen_row >> (SPRITE_PIXELS_WIDTH - j -1)) & 0x1;
+                    let old_pixel = (old_screen_row >> (SPRITE_PIXELS_WIDTH - j -1)) & 0x1;
+                    // Mark the operation as having changed the display
+                    if old_pixel == 1 && new_pixel == 0{
+                        screen_set = true
+                    }
                 }
-                // Mark the operation as having changed the display
-                screen_set = true;
+                
             }
         }
         screen_set

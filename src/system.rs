@@ -16,8 +16,8 @@ pub struct System {
    // This holds the current instruction processed by the cpu, normally it is None, only used for 
    // certain instructions that _halt_ the cpu until a condition is met. i.e. LD VX, K 
    curr_instr : Option<Box<dyn cpu::Instruction>>,
-
-   display: Display
+   pub draw_screen : bool,
+   pub display: Display
 }
 
 pub enum Error {
@@ -32,7 +32,8 @@ impl System {
             cpu: CPU::new(mem.clone()),
             mem: mem.clone(),
             curr_instr:  None,
-            display: Display::new()
+            display: Display::new(),
+            draw_screen: false
         }
     }
 
@@ -43,8 +44,6 @@ impl System {
     }
 
     pub fn do_drw_instr(&mut self, draw_instr: &cpu::DrwInstr) {
-
-        
         let mut sprite: Vec<u8> = vec!();
         let i_reg = self.cpu.i;
         for i in 0..draw_instr.n {
@@ -52,7 +51,7 @@ impl System {
         }
         let x = self.cpu.vregs[draw_instr.vx as usize];
         let y = self.cpu.vregs[draw_instr.vy as usize];
-        self.display.draw_sprite(x,y, sprite);
+        self.cpu.vf = self.display.draw_sprite(x,y, sprite);
     }
 
     pub fn step(&mut self) {
@@ -65,7 +64,13 @@ impl System {
                     if instr.is_waited_instr() {
                         self.curr_instr = Some(instr)
                     } else {
-                        instr.incr_pc(&mut self.cpu)
+                        instr.incr_pc(&mut self.cpu);
+                         // Test if any of these are special instructions we should handle
+                        if  let Some(drw_instr) = instr.as_any().downcast_ref::<cpu::DrwInstr>() {
+                            println!("DRAW: {}", instr.print());
+                            self.do_drw_instr(drw_instr);
+                            self.draw_screen = true
+                        }
                     }
                 }, 
                 Err(err) => {
@@ -82,10 +87,6 @@ impl System {
             match curr_instr {
                 Some(instr) => {
                     if instr.check_completed(self) {
-                        // Test if any of these are special instructions we should handle
-                        if  let Some(drw_instr) = instr.as_any().downcast_ref::<cpu::DrwInstr>() {
-                            self.do_drw_instr(drw_instr);
-                        }
                         instr.incr_pc(&mut self.cpu);
                         self.curr_instr = None;
                     }  else {

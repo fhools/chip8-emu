@@ -63,7 +63,7 @@ pub trait Instruction : fmt::Display  {
     }
 
     fn execute(&self, cpu: &mut CPU) {
-        println!("Executing instr pc = 0x{:X}, instr: {}", cpu.pc, self.print());
+        //println!("Executing instr pc = 0x{:X}, instr: {}", cpu.pc, self.print());
         self.do_instr(cpu);
     }
 
@@ -88,7 +88,7 @@ impl Instruction for SysInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed SYS");
+        //println!("executed SYS");
     }
 
     fn as_any(&self) ->  &dyn Any {
@@ -128,7 +128,7 @@ impl Instruction for RetInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed RET");
+        //println!("executed RET");
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -165,7 +165,7 @@ impl Instruction for CallInstr {
     }
 
     fn do_instr(&self, cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
         cpu.stack_push(cpu.pc + 2);
     }
 
@@ -202,7 +202,7 @@ impl Instruction for JpInstr {
 
 
     fn do_instr(&self, cpu: &mut CPU) {
-        println!("Executing {}", self);
+        //println!("Executing {}", self);
         if cpu.pc == self.addr {
             println!("JP to same address. Must be the end of the program");
             cpu.is_halted = true
@@ -236,7 +236,7 @@ impl Instruction for SeInstr {
     }
 
     fn do_instr(&self, cpu: &mut CPU) {
-        println!("executed SE");
+        //println!("executed SE");
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -270,7 +270,7 @@ impl Instruction for SneInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -304,7 +304,7 @@ impl Instruction for SeRegsInstr {
     }
 
     fn do_instr(&self, cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -637,7 +637,7 @@ impl Instruction for SneRegInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -696,7 +696,7 @@ impl Instruction for RndInstr {
     }
 
     fn do_instr(&self, cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
         let mut rng = rand::thread_rng();
         let random_byte : u8 = rng.gen();
         cpu.vregs[self.vx as usize] = random_byte & self.value; 
@@ -724,7 +724,7 @@ impl Instruction for JpV0Instr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -755,7 +755,7 @@ impl Instruction for DrwInstr {
     }
 
     fn do_instr(&self, cpu: &mut CPU)  {
-        println!("Drawing pixel at V{:X}, {:X}, {} bytes", self.vx, self.vy, self.n)
+        //println!("Drawing pixel at V{:X}, {:X}, {} bytes", self.vx, self.vy, self.n)
     }
 
     fn as_any(&self) ->  &dyn Any {
@@ -763,7 +763,7 @@ impl Instruction for DrwInstr {
     }
 
     fn is_waited_instr(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -783,7 +783,7 @@ impl Instruction for SkpInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed {}", self)
+        //println!("executed {}", self)
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -818,7 +818,7 @@ impl Instruction for SknpInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        println!("executed {}", self);
+        //println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
@@ -928,6 +928,9 @@ impl Instruction for StoreStInstr {
         format!("LD ST, V{:X}", self.vx)
     }
 
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.st = cpu.vregs[self.vx as usize];
+    }
     fn as_any(&self) ->  &dyn Any {
         self
     }
@@ -948,6 +951,9 @@ impl Instruction for AddIInstr {
         format!("ADD I,  V{:X}", self.vx)
     }
 
+    fn do_instr(&self, cpu: &mut CPU) {
+        cpu.i = cpu.i + (cpu.vregs[self.vx as usize] as u16);
+    }
     fn as_any(&self) ->  &dyn Any {
         self
     }
@@ -1008,6 +1014,11 @@ impl Instruction for StoreVxsIntoIInstr{
         format!("LD [I], V{:X}", self.vx)
     }
 
+    fn do_instr(&self, cpu: &mut CPU) {
+        for i in 0..self.vx {
+            cpu.store_byte_mem((cpu.i + (i as u16)) as usize, cpu.vregs[i as usize]);
+        }
+    }
     fn as_any(&self) ->  &dyn Any {
         self
     }
@@ -1028,6 +1039,11 @@ impl Instruction for LdVxsFromIInstr{
         format!("LD V{:X}, [I]", self.vx)
     }
 
+    fn do_instr(&self, cpu: &mut CPU) {
+        for i in 0..self.vx {
+            cpu.vregs[i as usize] = cpu.get_byte_mem((cpu.i + (i as u16)) as usize);
+        }
+    }
     fn as_any(&self) ->  &dyn Any {
         self
     }
@@ -1069,7 +1085,7 @@ impl CPU {
         instr.into()
     }
 
-    fn decode_instr(instr: u16) -> Result<Box<dyn Instruction>, DecodeError> {
+    pub fn decode_instr(instr: u16) -> Result<Box<dyn Instruction>, DecodeError> {
         let bits15_12 : u8 = (instr >> 12) as u8;
         let bits11_8 : u8 = ((instr >> 8) & 0xF) as u8;
         let bits7_4 : u8 = ((instr >> 4) & 0xF) as u8;

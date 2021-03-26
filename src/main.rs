@@ -1,23 +1,23 @@
 /* Emulator for CHIP8 CPU */
 
-use std::io::BufWriter;
-use std::path::Path;
-use std::time::Duration;
-
-use sdl2::pixels::Color;
+use clap::{App, Arg};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::pixels::{PixelFormatEnum, Color};
+use sdl2::rect;
 use sdl2::render::WindowCanvas;
-
-use clap::{App, Arg};
+use std::io::BufWriter;
+use std::path::Path;
+extern crate time;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 mod cpu;
+mod display;
 mod rom;
 mod system;
-mod display;
 use system::System;
 
-/*
+
 fn decode_instr(instr: u16) -> String {
     let bits15_12 = instr >> 12;
     let bits11_8 = (instr >> 8) & 0xF;
@@ -218,19 +218,60 @@ fn decode_instr(instr: u16) -> String {
     }
     result
 }
-*/
 
+fn draw_screen(
+    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+    display: &display::Display,
+) -> Result<(), String> {
+    let creator = canvas.texture_creator();
+
+    let mut texture = creator
+        .create_texture_target(PixelFormatEnum::RGBA8888, display::REAL_SCREEN_WIDTH_PIXELS as u32, display::REAL_SCREEN_HEIGHT_PIXELS as u32)
+        .map_err(|e| e.to_string())?;
+    canvas.with_texture_canvas(&mut texture, |texture_canvas| {
+        texture_canvas.set_draw_color(Color::BLACK);
+        texture_canvas.clear();
+        texture_canvas.set_draw_color(Color::RED);
+        for x in 0..display::SCREEN_WIDTH_PIXELS {
+            for y in 0..display::SCREEN_HEIGHT_PIXELS {
+                if display.mem[y as usize][x as usize] != 0 {
+                    //println!("Drawing pixel at ({}, {})", x, y);
+                    texture_canvas.fill_rect(rect::Rect::new(
+                        (x * display::PIXEL_WIDTH) as i32,
+                        (y * display::PIXEL_WIDTH) as i32,
+                        display::PIXEL_WIDTH as u32,
+                        display::PIXEL_HEIGHT as u32,
+                    )).expect("could not draw pixel");
+                }
+            }
+        }
+    }).map_err(|e| e.to_string())?;
+    let dst = Some(rect::Rect::new(0,0, display::REAL_SCREEN_WIDTH_PIXELS as u32, display::REAL_SCREEN_HEIGHT_PIXELS as u32));
+    canvas.copy(
+        &texture,
+        dst,
+        dst)?;
+    Ok(())
+}
 fn main() -> Result<(), String> {
     let sdl2_context = sdl2::init()?;
     let video_subsystem = sdl2_context.video()?;
 
-    let window  = video_subsystem.window("CHIP8 Emulator", 320, 200)
+    let window = video_subsystem
+        .window(
+            "CHIP8 Emulator",
+            display::REAL_SCREEN_WIDTH_PIXELS as u32,
+            display::REAL_SCREEN_HEIGHT_PIXELS as u32,
+        )
         .position_centered()
         .build()
         .expect("could not initialize sdl2 video_subsystem");
-    
-    let mut canvas = window.into_canvas().build().expect("could not make sdl2 canvas");
 
+    let mut canvas = window
+        .into_canvas()
+        .accelerated()
+        .build()
+        .expect("could not make sdl2 canvas");
     let mut event_pump = sdl2_context.event_pump()?;
 
     let mut buf = BufWriter::new(Vec::new());
@@ -263,33 +304,52 @@ fn main() -> Result<(), String> {
         } else if let Ok(rom) = rom {
             println!("read rom successfully");
             println!("rom size is {}", rom.size());
+            for i in rom.into_iter() {
+                let instr = cpu::CPU::decode_instr(i);
+                if let Ok(instr) = instr {
+                    println!("instr: {:X} = {}", i, instr.print())
+                }
+            }
             system.load_rom(&rom);
-          
         }
     }
-    
-   
+    canvas.set_draw_color(Color::BLACK);
+    canvas.clear();
+    let mut previous_time : std::time::Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     'running: loop {
-        canvas.set_draw_color(Color::BLACK);
-        canvas.clear();
-
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit {..} |
-                Event::KeyDown { keycode: Some(Keycode::Escape), ..} => {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
                     break 'running;
-                },
+                }
                 _ => {}
             }
         }
         
+        // Run one tick
         system.run_tick();
-        canvas.set_draw_color(Color::RED);
-        canvas.draw_point((0,0))?;
-        canvas.present();
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
 
+        // Draw screen
+        //if system.draw_screen {
+            draw_screen(&mut canvas, &system.display).expect("couldn't draw screen");
+            system.draw_screen = false;
+        //}
+        canvas.present();
+
+        // Display time
+        let start = SystemTime::now();
+        let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+        let delta = since_the_epoch - previous_time;
+        println!("{:?}", delta);
+        previous_time = since_the_epoch;
+        let  fps = 60;
+        std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / fps));
     }
     Ok(())
-
 }
