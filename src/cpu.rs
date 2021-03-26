@@ -976,7 +976,8 @@ impl Instruction for StoreSpriteInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
         let vx_val = cpu.vregs[self.vx as usize];
-        cpu.i = vx_val as u16;
+        // Each sprite for a digit is 5 bytes , starting address 0x for 0
+        cpu.i = (vx_val * 5) as u16;
     }
 
     fn as_any(&self) ->  &dyn Any {
