@@ -235,7 +235,7 @@ impl Instruction for SeInstr {
         skipeq
     }
 
-    fn do_instr(&self, cpu: &mut CPU) {
+    fn do_instr(&self, _cpu: &mut CPU) {
         //println!("executed SE");
     }
 
@@ -754,7 +754,7 @@ impl Instruction for DrwInstr {
         drw
     }
 
-    fn do_instr(&self, cpu: &mut CPU)  {
+    fn do_instr(&self, _cpu: &mut CPU)  {
         //println!("Drawing pixel at V{:X}, {:X}, {} bytes", self.vx, self.vy, self.n)
     }
 
@@ -787,7 +787,8 @@ impl Instruction for SkpInstr {
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
-        match cpu.curr_keys[self.vx as usize] {
+        let keyid = cpu.vregs[self.vx as usize] as usize;
+        match cpu.curr_keys[keyid] {
             Some(_) => {
                     cpu.pc += 4;
                     return;
@@ -818,13 +819,17 @@ impl Instruction for SknpInstr {
     }
 
     fn do_instr(&self, _cpu: &mut CPU) {
-        //println!("executed {}", self);
+        println!("executed {}", self);
     }
 
     fn incr_pc(&self, cpu: &mut CPU) {
-        match cpu.curr_keys[self.vx as usize] {
-            Some(_) => {},
+        let keyid = cpu.vregs[self.vx as usize] as usize;
+        match cpu.curr_keys[keyid] {
+            Some(_) => {
+                println!("SKNP: key {:X} is pressed", keyid);
+            },  
             None => {
+                println!("SKNP: key {:X} is not pressed", keyid);
                 cpu.pc += 4;
                 return;
             }

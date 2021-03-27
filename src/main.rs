@@ -5,7 +5,6 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{PixelFormatEnum, Color};
 use sdl2::rect;
-use sdl2::render::WindowCanvas;
 use std::io::BufWriter;
 use std::path::Path;
 extern crate time;
@@ -17,7 +16,7 @@ mod rom;
 mod system;
 use system::System;
 
-const DESIRED_FPS : u32 = 60;
+const DESIRED_FPS : u32 = 200;
 
 /* 
     This was our initial prototype of decoding instructions.
@@ -312,14 +311,7 @@ fn main() -> Result<(), String> {
         } else if let Ok(rom) = rom {
             println!("read rom successfully");
             println!("rom size is {}", rom.size());
-            let mut i = 0;
-            for data in rom.into_iter() {
-                let instr = cpu::CPU::decode_instr(data);
-                if let Ok(instr) = instr {
-                    println!("addr: {:0>4X} instr: {:0>4X} = {}", 0x200 + i, data, instr.print())
-                }
-                i += 2;
-            }
+            system.dump_rom(&rom);
             system.load_rom(&rom);
         }
     }
@@ -327,6 +319,9 @@ fn main() -> Result<(), String> {
     canvas.clear();
     let mut previous_time : std::time::Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     'running: loop {
+
+        
+       
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -335,10 +330,71 @@ fn main() -> Result<(), String> {
                     ..
                 } => {
                     break 'running;
-                }
+                },
+                Event::KeyDown { 
+                    keycode: Some(keypress),
+                    ..
+                } => {
+                    let mut curr_keypress : Option<u8> = None;
+                    match keypress {
+                        Keycode::Num1  => curr_keypress = Some(1),
+                        Keycode::Num2 => curr_keypress = Some(2),
+                        Keycode::Num3 => curr_keypress = Some(3),
+                        Keycode::Num4 => curr_keypress = Some(0xC),
+                        Keycode::Q => curr_keypress = Some(4),
+                        Keycode::W => curr_keypress = Some(5),
+                        Keycode::E => curr_keypress = Some(6),
+                        Keycode::R => curr_keypress = Some(0xD),
+                        Keycode::A => curr_keypress = Some(7),
+                        Keycode::S => curr_keypress = Some(8),
+                        Keycode::F => curr_keypress = Some(0xE),
+                        Keycode::Z => curr_keypress = Some(0xA),
+                        Keycode::X => curr_keypress = Some(0),
+                        Keycode::C => curr_keypress = Some(0xB),
+                        Keycode::V => curr_keypress = Some(0xF),
+                        _ => {}
+                    }
+                    if let Some(key) = curr_keypress {
+                        println!("key {:X} pressed", key);
+                        system.cpu.curr_keys[key as usize] = Some(true);
+                    } 
+                },
+                Event::KeyUp { 
+                    keycode: Some(keypress),
+                    ..
+                } => {
+                    let mut curr_keyrelease : Option<u8> = None;
+                    match keypress {
+                        Keycode::Num1  => curr_keyrelease = Some(1),
+                        Keycode::Num2 => curr_keyrelease = Some(2),
+                        Keycode::Num3 => curr_keyrelease = Some(3),
+                        Keycode::Num4 => curr_keyrelease = Some(0xC),
+                        Keycode::Q => curr_keyrelease = Some(4),
+                        Keycode::W => curr_keyrelease = Some(5),
+                        Keycode::E => curr_keyrelease = Some(6),
+                        Keycode::R => curr_keyrelease = Some(0xD),
+                        Keycode::A => curr_keyrelease = Some(7),
+                        Keycode::S => curr_keyrelease = Some(8),
+                        Keycode::D => curr_keyrelease = Some(9),
+                        Keycode::F => curr_keyrelease = Some(0xE),
+                        Keycode::Z => curr_keyrelease = Some(0xA),
+                        Keycode::X => curr_keyrelease = Some(0),
+                        Keycode::C => curr_keyrelease = Some(0xB),
+                        Keycode::V => curr_keyrelease = Some(0xF),
+                        _ => {}
+                    }
+                    if let Some(key) = curr_keyrelease {
+                        println!("key {:X} released", key);
+                        system.cpu.curr_keys[key as usize] = None;
+                    }
+                },
                 _ => {}
             }
         }
+        
+
+        // Pass along key input to CPU
+      
         
         // Run one tick
         system.run_tick();

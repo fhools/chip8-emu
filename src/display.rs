@@ -14,9 +14,6 @@ pub const PIXEL_HEIGHT : u16 = REAL_SCREEN_WIDTH_PIXELS / SCREEN_WIDTH_PIXELS;
 // Each sprite is 8 pixels wide and up to 15 pixels height.
 pub const SPRITE_PIXELS_WIDTH : u16 = 8;
 
-// screen dimensions in sprites
-pub const SCREEN_WIDTH_SPRITES : u16 = SCREEN_WIDTH_PIXELS / SPRITE_PIXELS_WIDTH;
-
 #[derive(Debug)]
 pub struct Display {
     // The screen is stored as as array of bytes. Even though the display

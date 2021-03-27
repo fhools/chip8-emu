@@ -40,11 +40,6 @@ pub struct System {
    pub display: Display
 }
 
-pub enum Error {
-    Err
-}
-
-
 impl System {
     pub fn new() -> Self {
         let mem = Rc::new(RefCell::new(vec![0; MEMSIZE]));
@@ -71,6 +66,17 @@ impl System {
         }
     }
 
+    pub fn dump_rom(&mut self, rom: &ROM) {
+        let mut i = 0;
+            for data in rom.into_iter() {
+                let instr = cpu::CPU::decode_instr(data);
+                if let Ok(instr) = instr {
+                    println!("addr: {:0>4X} instr: {:0>4X} = {}", ROM_OFFSET + i, data, instr.print())
+                }
+                i += 2;
+            }
+    }
+
     pub fn do_drw_instr(&mut self, draw_instr: &cpu::DrwInstr) {
         let mut sprite: Vec<u8> = vec!();
         let i_reg = self.cpu.i;
@@ -89,7 +95,7 @@ impl System {
             match ins {
                 Ok(instr) => {
                     instr.execute(&mut self.cpu);
-                    println!("PC: {:X} OPCODE: {:X} INSTR: {}", self.cpu.pc,  self.cpu.fetch_instr_from_addr(self.cpu.pc as usize) , instr.print());
+                    //println!("PC: {:X} OPCODE: {:X} INSTR: {}", self.cpu.pc,  self.cpu.fetch_instr_from_addr(self.cpu.pc as usize) , instr.print());
                     if instr.is_waited_instr() {
                         self.curr_instr = Some(instr)
                     } else {
