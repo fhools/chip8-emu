@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time;
 use crate::cpu;
 use crate::cpu::CPU;
 use crate::rom::ROM;
@@ -37,7 +38,12 @@ pub struct System {
    // certain instructions that _halt_ the cpu until a condition is met. i.e. LD VX, K 
    curr_instr : Option<Box<dyn cpu::Instruction>>,
    pub draw_screen : bool,
-   pub display: Display
+   pub display: Display,
+
+   // To keep track of time to decrement DT/ST timers
+   time_since_dt_update: f32
+   
+
 }
 
 impl System {
@@ -48,7 +54,8 @@ impl System {
             mem: mem.clone(),
             curr_instr:  None,
             display: Display::new(),
-            draw_screen: false
+            draw_screen: false,
+            time_since_dt_update: 0.0
         };
 
         // load font
@@ -85,7 +92,12 @@ impl System {
         }
         let x = self.cpu.vregs[draw_instr.vx as usize];
         let y = self.cpu.vregs[draw_instr.vy as usize];
-        self.cpu.vf = self.display.draw_sprite(x,y, sprite);
+        self.cpu.vregs[cpu::VF] = self.display.draw_sprite(x,y, sprite) as u8;
+        if self.cpu.vregs[cpu::VF] == 1 {
+            println!("YES WE GOT A HIT at {}, {}", x ,y);
+        } else { 
+            println!("NO  HIT at {}, {}", x ,y);
+        }
     }
 
     pub fn step(&mut self) {
@@ -95,7 +107,7 @@ impl System {
             match ins {
                 Ok(instr) => {
                     instr.execute(&mut self.cpu);
-                    //println!("PC: {:X} OPCODE: {:X} INSTR: {}", self.cpu.pc,  self.cpu.fetch_instr_from_addr(self.cpu.pc as usize) , instr.print());
+                    println!("PC: {:X} OPCODE: {:X} INSTR: {}", self.cpu.pc,  self.cpu.fetch_instr_from_addr(self.cpu.pc as usize) , instr.print());
                     if instr.is_waited_instr() {
                         self.curr_instr = Some(instr)
                     } else {
@@ -135,18 +147,26 @@ impl System {
             }
         }
     }
-    pub fn run_tick(&mut self) {
+    pub fn run_tick(&mut self, delta: std::time::Duration) {
            self.step();
-           self.update_dt_st();
+           self.update_dt_st(delta);
     }
 
-    pub fn update_dt_st(&mut self) {
-        if self.cpu.dt > 0 {
-            self.cpu.dt -= 1;
+    pub fn update_dt_st(&mut self, delta: std::time::Duration) {
+        
+        if self.time_since_dt_update >  (1000.0 / 60.0) {
+            if self.cpu.dt > 0 {
+                self.cpu.dt -= 1;
+            }
+    
+            if self.cpu.st > 0 {
+                self.cpu.st -= 1;
+            }
+            //reset counter
+            self.time_since_dt_update = 0.0;
+        } else {
+            self.time_since_dt_update += delta.as_millis() as f32;
         }
-
-        if self.cpu.st > 0 {
-            self.cpu.st -= 1;
-        }
+        
     }
 }

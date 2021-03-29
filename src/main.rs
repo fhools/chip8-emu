@@ -8,7 +8,7 @@ use sdl2::rect;
 use std::io::BufWriter;
 use std::path::Path;
 extern crate time;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
 
 mod cpu;
 mod display;
@@ -16,7 +16,7 @@ mod rom;
 mod system;
 use system::System;
 
-const DESIRED_FPS : u32 = 200;
+const DESIRED_FPS : u32 = 60;
 
 /* 
     This was our initial prototype of decoding instructions.
@@ -392,12 +392,25 @@ fn main() -> Result<(), String> {
             }
         }
         
+        // Compute delta since last frame
+        let start = SystemTime::now();
+        let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+        let delta = since_the_epoch - previous_time;
+        println!("{:?}", delta);
+        previous_time = since_the_epoch;
 
-        // Pass along key input to CPU
-      
-        
-        // Run one tick
-        system.run_tick();
+        const INSTR_PER_FRAME : f32 = 10.0;
+        let time_per_frame_in_milli =  ((1.0/(DESIRED_FPS as f32) * 1000.0) as f32);
+        println!("time_per_frame in milli: {}", time_per_frame_in_milli);
+        let delta_each_instr_per_frame = 
+            (time_per_frame_in_milli/INSTR_PER_FRAME * 1000.0);  
+        let time_per_instr = std::time::Duration::from_micros(delta_each_instr_per_frame as u64);
+        // Since we are running at 60 fps and the CHIP-8 runs at 500 Hz 500
+        for _i in 0..(INSTR_PER_FRAME as u32) {
+            system.run_tick(time_per_instr);
+        }
 
         // Draw screen
         //if system.draw_screen {
@@ -407,13 +420,7 @@ fn main() -> Result<(), String> {
         canvas.present();
 
         // Display time
-        let start = SystemTime::now();
-        let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-        let delta = since_the_epoch - previous_time;
-        println!("{:?}", delta);
-        previous_time = since_the_epoch;
+       
         std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / DESIRED_FPS));
     }
     Ok(())

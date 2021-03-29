@@ -5,12 +5,13 @@ use std::any::Any;
 
 use rand::Rng;
 use crate::System;
+
+pub const VF : usize = 0xF;
 #[derive(Debug)]
 pub struct CPU {
     pub pc: u16,
     pub vregs: [u8; 16],
     pub i: u16,
-    pub vf: bool,
     pub stack: Vec<u16>,
     pub memory: Rc<RefCell<Vec<u8>>>,
     pub curr_keys: [Option<bool>; 16],
@@ -497,7 +498,7 @@ impl Instruction for AddInstr {
     fn do_instr(&self, cpu: &mut CPU) {
         let (add_result, carry) = cpu.vregs[self.vx as usize].overflowing_add(cpu.vregs[self.vy as usize]); 
         cpu.vregs[self.vx as usize] = add_result;
-        cpu.vf = carry;
+        cpu.vregs[0xF] = carry as u8;
     }
 
     fn as_any(&self) ->  &dyn Any {
@@ -525,7 +526,7 @@ impl Instruction for SubInstr {
     fn do_instr(&self, cpu: &mut CPU) {
         let (sub_result, not_underflow) = cpu.vregs[self.vx as usize].overflowing_sub(cpu.vregs[self.vy as usize]); 
         cpu.vregs[self.vx as usize] = sub_result;
-        cpu.vf = !not_underflow;
+        cpu.vregs[0xF] = (!not_underflow) as u8;
     }
 
     fn as_any(&self) ->  &dyn Any {
@@ -552,7 +553,7 @@ impl Instruction for ShrInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
        if cpu.vregs[self.vx as usize] & 1 == 1 {
-           cpu.vf = true;
+           cpu.vregs[VF] = 1;
        }
        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_shr(1); 
     }
@@ -582,7 +583,7 @@ impl Instruction for SubnInstr {
     fn do_instr(&self, cpu: &mut CPU) {
         let (sub_result, not_underflow) = cpu.vregs[self.vx as usize].overflowing_sub(cpu.vregs[self.vy as usize]); 
         cpu.vregs[self.vx as usize] = sub_result;
-        cpu.vf = not_underflow;
+        cpu.vregs[VF] = not_underflow as u8;
     }
 
     fn as_any(&self) ->  &dyn Any {
@@ -609,7 +610,7 @@ impl Instruction for ShlInstr {
 
     fn do_instr(&self, cpu: &mut CPU) {
        if cpu.vregs[self.vx as usize] & 0x80 == 0x80 {
-           cpu.vf = true;
+           cpu.vregs[VF] = 1;
        }
        cpu.vregs[self.vx as usize] = cpu.vregs[self.vx as usize].wrapping_shl(1); 
     }
@@ -1088,7 +1089,6 @@ impl CPU {
             vregs: [0; 16],
             stack: vec![],
             i: 0,
-            vf: false,
             memory: mem,
             curr_keys: [None; 16],
             is_halted: false,
