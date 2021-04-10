@@ -6,7 +6,7 @@ use crate::cpu::CPU;
 use crate::rom::ROM;
 use crate::display::Display;
 
-pub const MEMSIZE: usize = 4*1024;
+pub const MEMSIZE: usize = 4 * 1024;
 pub const ROM_OFFSET: usize = 0x200;
 
 // character fonts. loaded into memory starting at address 0x0
@@ -153,9 +153,10 @@ impl System {
     }
 
     pub fn update_dt_st(&mut self, delta: std::time::Duration) {
-        
-        if self.time_since_dt_update >  (1000.0 / 60.0) {
+        println!("{:?} time_since_update: {}", delta, self.time_since_dt_update);
+        if self.time_since_dt_update >=  (1000.0 / 60.0) {
             if self.cpu.dt > 0 {
+                println!("decrement dt");
                 self.cpu.dt -= 1;
             }
     
@@ -163,9 +164,11 @@ impl System {
                 self.cpu.st -= 1;
             }
             //reset counter
-            self.time_since_dt_update = 0.0;
+            self.time_since_dt_update = self.time_since_dt_update - (1000.0 / 60.0);
         } else {
-            self.time_since_dt_update += delta.as_millis() as f32;
+            let dt = (delta.as_micros() as f32) / 1000.0;
+            println!("dt update: {}", dt);
+            self.time_since_dt_update += dt;
         }
         
     }

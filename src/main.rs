@@ -7,7 +7,6 @@ use sdl2::pixels::{PixelFormatEnum, Color};
 use sdl2::rect;
 use std::io::BufWriter;
 use std::path::Path;
-extern crate time;
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
 
 mod cpu;
@@ -319,9 +318,6 @@ fn main() -> Result<(), String> {
     canvas.clear();
     let mut previous_time : std::time::Duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     'running: loop {
-
-        
-       
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -355,7 +351,6 @@ fn main() -> Result<(), String> {
                         _ => {}
                     }
                     if let Some(key) = curr_keypress {
-                        println!("key {:X} pressed", key);
                         system.cpu.curr_keys[key as usize] = Some(true);
                     } 
                 },
@@ -384,7 +379,6 @@ fn main() -> Result<(), String> {
                         _ => {}
                     }
                     if let Some(key) = curr_keyrelease {
-                        println!("key {:X} released", key);
                         system.cpu.curr_keys[key as usize] = None;
                     }
                 },
@@ -395,20 +389,23 @@ fn main() -> Result<(), String> {
         // Compute delta since last frame
         let start = SystemTime::now();
         let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
+        .duration_since(UNIX_EPOCH).unwrap();
         let delta = since_the_epoch - previous_time;
-        println!("{:?}", delta);
+        println!("frame: {:?}", delta);
         previous_time = since_the_epoch;
 
+         // Since we are running at 60 fps and the CHIP-8 runs at 500 Hz 500. 
+         // We're gonna run 10 instructions for each frame. Compute
+         // the time spent per instruction, primarily to support DT/ST instruct-
+         // ions.
         const INSTR_PER_FRAME : f32 = 10.0;
-        let time_per_frame_in_milli =  ((1.0/(DESIRED_FPS as f32) * 1000.0) as f32);
-        println!("time_per_frame in milli: {}", time_per_frame_in_milli);
-        let delta_each_instr_per_frame = 
-            (time_per_frame_in_milli/INSTR_PER_FRAME * 1000.0);  
-        let time_per_instr = std::time::Duration::from_micros(delta_each_instr_per_frame as u64);
-        // Since we are running at 60 fps and the CHIP-8 runs at 500 Hz 500
-        for _i in 0..(INSTR_PER_FRAME as u32) {
+        let time_per_frame_in_micro =  1.0/(DESIRED_FPS as f32) * 1_000_000.0;
+        println!("time_per_frame in microsec: {}", time_per_frame_in_micro);
+        let time_per_instr = std::time::Duration::from_micros((time_per_frame_in_micro/INSTR_PER_FRAME) as u64);
+
+
+       
+        for _i in 0..INSTR_PER_FRAME as u32 {
             system.run_tick(time_per_instr);
         }
 
